@@ -1,3 +1,4 @@
+
 const path = require('path');
 const express = require('express');
 const mongoose = require('mongoose');
@@ -10,45 +11,72 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 const publicDir = path.join(__dirname, 'public');
 
-// ─── TODO: Write the connectToDatabase function ──────────────────────────────
-// This function should:
-//   1. Check if process.env.MONGODB_URI exists
-//      - If missing, warn the user and return early
-//      - Message: "MONGODB_URI is missing. Create a .env file in backend/ before testing database features."
-//   2. Use a try-catch block to safely connect to MongoDB with mongoose.connect()
-//      - Pass options: { dbName: 'blog' }
-//      - Log success: "Connected to MongoDB"
-//      - Log error: "MongoDB connection error: <error.message>"
-//   3. Return a Promise (async/await)
-//
-// Hint: See WS05 Server.js for the completed version
-
+// Connect to MongoDB
 async function connectToDatabase() {
-  // Your code here
-  throw new Error('connectToDatabase not implemented. See TODO above.')
+  if (!process.env.MONGODB_URI) {
+    console.warn(
+      'MONGODB_URI is missing. Create a .env file in backend/ before testing database features.'
+    );
+    return;
+  }
+
+  try {
+    await mongoose.connect(process.env.MONGODB_URI, {
+      dbName: 'blog'
+    });
+
+    console.log('Connected to MongoDB');
+  } catch (error) {
+    console.error('MongoDB connection error:', error);
+    throw error;
+  }
 }
 
+// Middleware
 app.locals.publicDir = publicDir;
+
 app.use(express.json());
 app.use(express.static(publicDir));
 
+// Routes
 app.use('/', pagesRouter);
 app.use('/api/posts', postsRouter);
 
+// Handle 404 errors
 app.use((req, res) => {
+  if (req.path.startsWith('/api/')) {
+    return res.status(404).json({
+      message: 'API route not found'
+    });
+  }
+
   res.status(404).sendFile(path.join(publicDir, '404.html'));
 });
 
+// Handle server errors
 app.use((error, req, res, next) => {
   console.error(error.stack);
+
+  if (req.path.startsWith('/api/')) {
+    return res.status(500).json({
+      message: 'Internal server error'
+    });
+  }
+
   res.status(500).sendFile(path.join(publicDir, '500.html'));
 });
 
-connectToDatabase().then(() => {
-  app.listen(PORT, () => {
-    console.log(`Server is running on http://localhost:${PORT}`);
-    console.log('Mounted routers:');
-    console.log('  / -> routes/pages.js');
-    console.log('  /api/posts -> routes/posts.js');
+// Start server
+connectToDatabase()
+  .then(() => {
+    app.listen(PORT, () => {
+      console.log(`Server is running on http://localhost:${PORT}`);
+      console.log('Mounted routers:');
+      console.log('  / -> routes/pages.js');
+      console.log('  /api/posts -> routes/posts.js');
+    });
+  })
+  .catch((error) => {
+    console.error('Failed to start server:', error.message);
+    process.exitCode = 1;
   });
-});
